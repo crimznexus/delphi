@@ -1,0 +1,22 @@
+# Python junk
+__pycache__/
+*.py[cod]
+*.so
+
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Delphi Data (DO NOT UPLOAD BOOKS OR DB)
+data/books/*
+!data/books/.gitkeep
+db/
+
+# Local Logs
+*.log
