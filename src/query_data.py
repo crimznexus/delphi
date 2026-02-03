@@ -1,11 +1,10 @@
 import argparse
-from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
-from langchain_ollama import ChatOllama
-from langchain_core.prompts import ChatPromptTemplate
+import json
+import os
 
 # --- Configuration ---
 CHROMA_PATH = "./db/chroma_db"
+DOCS_FILE = "./data/documents.json"
 PROMPT_TEMPLATE = """
 You are an expert tutor for a student. Use the following context from the course text to answer the question.
 If the answer is not in the context, say "I don't find that information in your course books" and do not try to make it up.
@@ -19,15 +18,39 @@ Question: {question}
 Answer:
 """
 
-def main():
-    # 1. Initialize the Database (The Library)
-    embedding_function = OllamaEmbeddings(model="nomic-embed-text")
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+def load_documents():
+    """Load documents from JSON file."""
+    if os.path.exists(DOCS_FILE):
+        try:
+            with open(DOCS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
 
+def similarity_search(query: str, docs, k: int = 5):
+    """Simple keyword-based similarity search."""
+    if not docs:
+        return []
+    q_words = [w.lower() for w in query.split() if w.strip()]
+    scored = []
+    for doc in docs:
+        text = doc.get("page_content", "") or ""
+        text_low = text.lower()
+        score = sum(text_low.count(w) for w in q_words)
+        scored.append((doc, float(score)))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [doc for doc, _ in scored[:k]]
+
+def main():
+    # 1. Load Documents
+    docs = load_documents()
+    
     # 2. Welcome Message
     print("----------------------------------------------------------------")
     print("Welcome to Delphi! 🏛️")
     print("I am ready to help you study. Type 'exit' or 'quit' to stop.")
+    print("(Note: This is a text-based demo with placeholder responses)")
     print("----------------------------------------------------------------")
 
     # 3. Chat Loop
@@ -40,33 +63,22 @@ def main():
             break
         
         # 4. Search the DB (Retrieval)
-        # k=5 means "get the 5 most relevant chunks from the book"
-        results = db.similarity_search_with_score(query_text, k=5)
+        results = similarity_search(query_text, docs, k=5)
 
         if not results:
             print("\nDelphi: I couldn't find any relevant context in the database.")
             continue
 
         # 5. Combine Context (RAG)
-        # We join the text of the found pages together
-        context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+        context_text = "\n\n---\n\n".join([doc.get("page_content", "") for doc in results])
         
         # 6. Setup the Prompt
-        prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-        prompt = prompt_template.format(context=context_text, question=query_text)
+        prompt = PROMPT_TEMPLATE.format(context=context_text, question=query_text)
 
-        # 7. Ask Phi-3.5 (Generation)
-        # Temperature=0.3 makes it creative enough to be fluent, but strict on facts
-        model = ChatOllama(model="phi3.5", temperature=0.3) 
-        
-        print("\nDelphi is thinking...\n")
-        response_text = model.invoke(prompt)
-
-        # 8. Output Answer
-        print(f"Delphi: {response_text.content}")
-        
-        # Optional: Show sources (Debugging/Verification)
-        # print(f"\n[Sources: {results[0][0].metadata.get('source', 'Unknown')}]")
+        # 7. Placeholder Response (Ollama not configured)
+        print("\nDelphi: Based on your course materials:")
+        print(f"Context: {context_text[:200]}...")
+        print("(Full AI response would require Ollama configured)")
 
 if __name__ == "__main__":
     main()
